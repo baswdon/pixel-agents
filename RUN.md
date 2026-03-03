@@ -103,7 +103,7 @@ src/agentManager.ts          — createKolidoAgents() (folderName + no terminals
 src/PixelAgentsViewProvider.ts — Kolido mode branch on webviewReady
 src/types.ts                 — Kolido fields on AgentState
 src/constants.ts             — Kolido timing/setting constants
-webview-ui/.../useExtensionMessages.ts — agentMeta state + handler
+webview-ui/.../useExtensionMessages.ts — agentMeta state + layout-first agent ordering fix
 webview-ui/.../AgentLabels.tsx   — Persistent name + tier badge (always visible)
 webview-ui/.../ToolOverlay.tsx   — Detail card + tier badge (on hover/select)
 ```

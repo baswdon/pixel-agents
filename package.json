@@ -80,13 +80,14 @@
   "scripts": {
     "vscode:prepublish": "npm run package",
     "build:webview": "cd webview-ui && npm run build",
-    "compile": "npm run check-types && npm run lint && node esbuild.js && npm run build:webview",
+    "compile": "npm run check-no-nul && npm run check-types && npm run lint && node esbuild.js && npm run build:webview",
     "build": "npm run compile",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-    "package": "npm run check-types && npm run lint && node esbuild.js --production && npm run build:webview",
+    "package": "npm run check-no-nul && npm run check-types && npm run lint && node esbuild.js --production && npm run build:webview",
     "check-types": "tsc --noEmit",
+    "check-no-nul": "node -e \"const fs=require('fs');['nul','NUL'].forEach(n=>{if(fs.existsSync(n)){console.error('ERROR: junk file \\\"'+n+'\\\" found in repo root (Windows NUL device artifact). Delete it.');process.exit(1)}})\"",
     "lint": "eslint src",
     "import-tileset": "tsx scripts/import-tileset-cli.ts"
   },

@@ -14,6 +14,18 @@ All code changes are complete. Build is clean, verifier passes (47/47). This run
 
 **No code changes in this ticket.** Telegram remains approvals/alerts only.
 
+### Recent Commits
+
+| Hash | Description |
+|------|-------------|
+| `a4ab09c` | chore: gitignore devhost userdata + remove junk nul file |
+| `5ccaad6` | fix(kolido): render character sprites via layout-first agent ordering |
+| `7dcfb60` | feat(kolido): devhost launch config + auto-enable command + launcher |
+| `55cd4b0` | feat(kolido): add replayLastN setting + self-test command |
+| `1905fca` | feat(kolido): kolidoMode audit tail + tier badges + verifier |
+
+> **Note:** `.vscode-devhost-userdata/` is gitignored (machine-local Extension Dev Host state). If you launch with `--user-data-dir`, VS Code stores settings, extensions, and cached data there. It must never be committed.
+
 ---
 
 ## Prerequisites
@@ -285,6 +297,7 @@ Then in `launch.json`, remove or comment out the `"preLaunchTask"` line and pres
 All of these must be true:
 
 - [ ] 6 agents visible with correct display names (Media Dev, Audio, Artist, Toolsmith, Pipeline, Researcher)
+- [ ] 6 character sprites visible in the isometric office on first launch (no reload needed)
 - [ ] Debug Console / Dev Tools shows `[Kolido] Tailing ... from offset <number>`
 - [ ] Sending a short Discord message → agent animates: reading → typing → idle
 - [ ] Tier badge appears with correct color after `chat_model_selected` event
