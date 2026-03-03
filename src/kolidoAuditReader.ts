@@ -54,18 +54,63 @@ export interface KolidoReaderHandle {
 	dispose(): void;
 }
 
+// ── Seek helper for REPLAY_LAST_N ────────────────────────────
+
+/**
+ * Find the byte offset that is N lines from the end of a file.
+ * Reads backward in 8 KB chunks counting newline bytes.
+ * Returns 0 if the file has fewer than N lines.
+ */
+function seekBackNLines(filePath: string, fileSize: number, n: number): number {
+	if (fileSize === 0 || n <= 0) return fileSize;
+
+	const CHUNK = 8192;
+	const fd = fs.openSync(filePath, 'r');
+	let pos = fileSize;
+	let newlines = 0;
+	let resultOffset = 0;
+
+	try {
+		while (pos > 0) {
+			const readSize = Math.min(CHUNK, pos);
+			pos -= readSize;
+			const buf = Buffer.alloc(readSize);
+			fs.readSync(fd, buf, 0, readSize, pos);
+
+			// Scan backward through the chunk
+			for (let i = readSize - 1; i >= 0; i--) {
+				if (buf[i] === 0x0A) { // newline
+					newlines++;
+					if (newlines > n) {
+						// Found the (n+1)th newline from end — start after it
+						resultOffset = pos + i + 1;
+						return resultOffset;
+					}
+				}
+			}
+		}
+	} finally {
+		fs.closeSync(fd);
+	}
+
+	// Fewer than N lines in file — replay everything
+	return 0;
+}
+
 /**
  * Start tailing the audit log and dispatching webview messages.
  *
  * @param auditLogPath  Absolute path to audit.jsonl
  * @param agents        Map of pixelId → AgentState (already registered)
  * @param webview       Webview to post messages to
+ * @param replayLastN   When > 0, replay the last N lines on startup instead of tailing from end
  * @returns             Handle with dispose() to stop tailing
  */
 export function startKolidoReader(
 	auditLogPath: string,
 	agents: Map<number, AgentState>,
 	webview: vscode.Webview | undefined,
+	replayLastN: number = 0,
 ): KolidoReaderHandle {
 	// Build kolidoAgentId → mapState lookup
 	const mapStates = new Map<string, KolidoAgentMapState>();
@@ -85,13 +130,18 @@ export function startKolidoReader(
 	let disposed = false;
 	let retryCount = 0;
 
-	// Skip to end of existing file
+	// Determine start offset
 	try {
 		if (fs.existsSync(auditLogPath)) {
 			const stat = fs.statSync(auditLogPath);
-			fileOffset = stat.size;
 			retryCount = 0;
-			console.log(`[Kolido] Tailing ${auditLogPath} from offset ${fileOffset}`);
+			if (replayLastN > 0) {
+				fileOffset = seekBackNLines(auditLogPath, stat.size, replayLastN);
+				console.log(`[Kolido] REPLAY_LAST_N=${replayLastN} offset=${fileOffset}`);
+			} else {
+				fileOffset = stat.size;
+				console.log(`[Kolido] TAIL_ONLY offset=${fileOffset}`);
+			}
 		} else {
 			console.log(`[Kolido] Audit log not found, waiting: ${auditLogPath}`);
 		}

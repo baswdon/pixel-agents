@@ -27,6 +27,10 @@
       {
         "command": "pixel-agents.exportDefaultLayout",
         "title": "Pixel Agents: Export Layout as Default"
+      },
+      {
+        "command": "pixel-agents.kolidoSelfTest",
+        "title": "Pixel Agents: Kolido Self-Test"
       }
     ],
     "viewsContainers": {
@@ -59,6 +63,12 @@
           "type": "string",
           "default": "C:\\KolidoAgentWorkspace\\logs\\audit.jsonl",
           "description": "Path to the Kolido audit log file (only used when kolidoMode is enabled)."
+        },
+        "pixel-agents.kolidoReplayLastN": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Replay the last N audit lines on startup (0 = tail new events only). Useful for debugging."
         }
       }
     }

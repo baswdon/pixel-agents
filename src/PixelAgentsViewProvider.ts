@@ -15,11 +15,12 @@ import {
 } from './agentManager.js';
 import { ensureProjectScan } from './fileWatcher.js';
 import { loadFurnitureAssets, sendAssetsToWebview, loadFloorTiles, sendFloorTilesToWebview, loadWallTiles, sendWallTilesToWebview, loadCharacterSprites, sendCharacterSpritesToWebview, loadDefaultLayout } from './assetLoader.js';
-import { WORKSPACE_KEY_AGENT_SEATS, GLOBAL_KEY_SOUND_ENABLED, KOLIDO_SETTING_MODE, KOLIDO_SETTING_AUDIT_LOG, KOLIDO_DEFAULT_AUDIT_LOG } from './constants.js';
+import { WORKSPACE_KEY_AGENT_SEATS, GLOBAL_KEY_SOUND_ENABLED, KOLIDO_SETTING_MODE, KOLIDO_SETTING_AUDIT_LOG, KOLIDO_SETTING_REPLAY_LAST_N, KOLIDO_DEFAULT_AUDIT_LOG } from './constants.js';
 import { writeLayoutToFile, readLayoutFromFile, watchLayoutFile } from './layoutPersistence.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
-import { startKolidoReader } from './kolidoAuditReader.js';
+import { startKolidoReader, replayFixture } from './kolidoAuditReader.js';
 import type { KolidoReaderHandle } from './kolidoAuditReader.js';
+import { KOLIDO_AGENTS } from './kolidoConfig.js';
 
 export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 	nextAgentId = { current: 1 };
@@ -58,6 +59,11 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 	/** Get the configured audit log path */
 	private get kolidoAuditLogPath(): string {
 		return vscode.workspace.getConfiguration().get<string>(KOLIDO_SETTING_AUDIT_LOG, KOLIDO_DEFAULT_AUDIT_LOG);
+	}
+
+	/** How many audit lines to replay on startup (0 = tail new events only) */
+	private get kolidoReplayLastN(): number {
+		return vscode.workspace.getConfiguration().get<number>(KOLIDO_SETTING_REPLAY_LAST_N, 0);
 	}
 
 	private get extensionUri(): vscode.Uri {
@@ -133,8 +139,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
 					// Start tailing audit log
 					const auditPath = this.kolidoAuditLogPath;
+					const replayLastN = this.kolidoReplayLastN;
 					console.log(`[Kolido] Starting audit reader: ${auditPath}`);
-					this.kolidoReader = startKolidoReader(auditPath, this.agents, this.webview);
+					this.kolidoReader = startKolidoReader(auditPath, this.agents, this.webview, replayLastN);
 					return; // skip normal terminal-based restore
 				}
 
@@ -296,6 +303,72 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 		const json = JSON.stringify(layout, null, 2);
 		fs.writeFileSync(targetPath, json, 'utf-8');
 		vscode.window.showInformationMessage(`Pixel Agents: Default layout exported to ${targetPath}`);
+	}
+
+	// ── Kolido Self-Test ─────────────────────────────────────────
+
+	/**
+	 * Run an in-memory fixture replay and verify EASY/BASELINE/BOOST tiers.
+	 * Does NOT write to the real audit.jsonl — reads from fixtures/ only.
+	 */
+	kolidoSelfTest(): void {
+		if (!this.isKolidoMode) {
+			vscode.window.showErrorMessage('Kolido Self-Test requires kolidoMode to be enabled.');
+			return;
+		}
+
+		// Resolve fixture path relative to extension root
+		const fixturePath = path.join(this.extensionUri.fsPath, 'fixtures', 'kolido-audit-test.fixture.jsonl');
+		let fixtureContent: string;
+		try {
+			fixtureContent = fs.readFileSync(fixturePath, 'utf-8');
+		} catch (e) {
+			vscode.window.showErrorMessage(`Kolido Self-Test: Cannot read fixture at ${fixturePath}`);
+			return;
+		}
+
+		// Build agent configs from the canonical roster
+		const agentConfigs = KOLIDO_AGENTS.map((cfg, i) => ({
+			kolidoAgentId: cfg.agentId,
+			pixelId: i + 1,
+			displayName: cfg.displayName,
+		}));
+
+		// Pure replay — no file I/O, no network
+		const { messages, totalEvents } = replayFixture(fixtureContent, agentConfigs);
+
+		// Collect observed tiers from agentMeta messages
+		const observedTiers = new Set<string>();
+		for (const agentMsgs of messages.values()) {
+			for (const msg of agentMsgs) {
+				if (msg.type === 'agentMeta' && typeof msg.modelTier === 'string') {
+					observedTiers.add(msg.modelTier);
+				}
+			}
+		}
+
+		// Verify all 3 tiers
+		const required = ['EASY', 'BASELINE', 'BOOST'];
+		const missing = required.filter(t => !observedTiers.has(t));
+
+		if (missing.length === 0) {
+			vscode.window.showInformationMessage(
+				`✓ Kolido Self-Test PASSED: EASY/BASELINE/BOOST observed (${totalEvents} events)`
+			);
+		} else {
+			vscode.window.showErrorMessage(
+				`✗ Kolido Self-Test FAILED: missing tiers [${missing.join(', ')}]`
+			);
+		}
+
+		// Dispatch replayed messages to webview for visual feedback
+		if (this.webview) {
+			for (const agentMsgs of messages.values()) {
+				for (const msg of agentMsgs) {
+					this.webview.postMessage(msg);
+				}
+			}
+		}
 	}
 
 	private startLayoutWatcher(): void {
