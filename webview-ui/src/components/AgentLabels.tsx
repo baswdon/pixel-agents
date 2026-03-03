@@ -1,12 +1,35 @@
 import { useState, useEffect } from 'react'
 import type { OfficeState } from '../office/engine/officeState.js'
-import type { SubagentCharacter } from '../hooks/useExtensionMessages.js'
+import type { SubagentCharacter, AgentMeta } from '../hooks/useExtensionMessages.js'
 import { TILE_SIZE, CharacterState } from '../office/types.js'
+
+/** Extract short size tag from model string — e.g. "qwen2.5-coder:32b" → "32b" */
+function shortModelTag(tag: string | undefined): string {
+  if (!tag) return ''
+  const colonIdx = tag.lastIndexOf(':')
+  return colonIdx >= 0 ? tag.slice(colonIdx + 1) : tag
+}
+
+/** Get tier badge color (matches ToolOverlay for consistency) */
+function getTierColor(tier: string | undefined): string | null {
+  if (!tier) return null
+  switch (tier.toUpperCase()) {
+    case 'BOOST':
+      return 'var(--pixel-status-active, #3794ff)'
+    case 'BASELINE':
+      return 'var(--pixel-text-dim, #888)'
+    case 'EASY':
+      return 'var(--vscode-charts-green, #73c991)'
+    default:
+      return null
+  }
+}
 
 interface AgentLabelsProps {
   officeState: OfficeState
   agents: number[]
   agentStatuses: Record<number, string>
+  agentMetas: Record<number, AgentMeta>
   containerRef: React.RefObject<HTMLDivElement | null>
   zoom: number
   panRef: React.RefObject<{ x: number; y: number }>
@@ -17,6 +40,7 @@ export function AgentLabels({
   officeState,
   agents,
   agentStatuses,
+  agentMetas,
   containerRef,
   zoom,
   panRef,
@@ -78,7 +102,12 @@ export function AgentLabels({
           dotColor = 'var(--vscode-charts-blue, #3794ff)'
         }
 
-        const labelText = subLabelMap.get(id) || `Agent #${id}`
+        const labelText = ch.folderName || subLabelMap.get(id) || `Agent #${id}`
+
+        // Tier badge for Kolido agents (driven by agentMeta messages only)
+        const meta = agentMetas[id]
+        const tierColor = getTierColor(meta?.modelTier)
+        const modelShort = shortModelTag(meta?.modelTag)
 
         return (
           <div
@@ -122,6 +151,18 @@ export function AgentLabels({
               }}
             >
               {labelText}
+              {tierColor && meta?.modelTier && (
+                <span
+                  style={{
+                    fontSize: '13px',
+                    color: tierColor,
+                    fontWeight: 600,
+                    marginLeft: 4,
+                  }}
+                >
+                  {meta.modelTier}{modelShort ? ` ${modelShort}` : ''}
+                </span>
+              )}
             </span>
           </div>
         )

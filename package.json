@@ -46,6 +46,21 @@
           "name": "Pixel Agents"
         }
       ]
+    },
+    "configuration": {
+      "title": "Pixel Agents",
+      "properties": {
+        "pixel-agents.kolidoMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Kolido mode: read agent activity from a Kolido audit.jsonl instead of Claude Code terminals."
+        },
+        "pixel-agents.kolidoAuditLogPath": {
+          "type": "string",
+          "default": "C:\\KolidoAgentWorkspace\\logs\\audit.jsonl",
+          "description": "Path to the Kolido audit log file (only used when kolidoMode is enabled)."
+        }
+      }
     }
   },
   "scripts": {

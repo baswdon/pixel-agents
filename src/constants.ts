@@ -40,3 +40,10 @@ export const WORKSPACE_KEY_AGENTS = 'pixel-agents.agents';
 export const WORKSPACE_KEY_AGENT_SEATS = 'pixel-agents.agentSeats';
 export const WORKSPACE_KEY_LAYOUT = 'pixel-agents.layout';
 export const TERMINAL_NAME_PREFIX = 'Claude Code';
+
+// ── Kolido Mode ─────────────────────────────────────────────
+export const KOLIDO_AUDIT_POLL_INTERVAL_MS = 500;
+export const KOLIDO_AUDIT_RETRY_INTERVAL_MS = 5000;
+export const KOLIDO_SETTING_MODE = 'pixel-agents.kolidoMode';
+export const KOLIDO_SETTING_AUDIT_LOG = 'pixel-agents.kolidoAuditLogPath';
+export const KOLIDO_DEFAULT_AUDIT_LOG = 'C:\\KolidoAgentWorkspace\\logs\\audit.jsonl';

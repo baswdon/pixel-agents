@@ -11,12 +11,15 @@ import {
 	sendExistingAgents,
 	sendLayout,
 	getProjectDirPath,
+	createKolidoAgents,
 } from './agentManager.js';
 import { ensureProjectScan } from './fileWatcher.js';
 import { loadFurnitureAssets, sendAssetsToWebview, loadFloorTiles, sendFloorTilesToWebview, loadWallTiles, sendWallTilesToWebview, loadCharacterSprites, sendCharacterSpritesToWebview, loadDefaultLayout } from './assetLoader.js';
-import { WORKSPACE_KEY_AGENT_SEATS, GLOBAL_KEY_SOUND_ENABLED } from './constants.js';
+import { WORKSPACE_KEY_AGENT_SEATS, GLOBAL_KEY_SOUND_ENABLED, KOLIDO_SETTING_MODE, KOLIDO_SETTING_AUDIT_LOG, KOLIDO_DEFAULT_AUDIT_LOG } from './constants.js';
 import { writeLayoutToFile, readLayoutFromFile, watchLayoutFile } from './layoutPersistence.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
+import { startKolidoReader } from './kolidoAuditReader.js';
+import type { KolidoReaderHandle } from './kolidoAuditReader.js';
 
 export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 	nextAgentId = { current: 1 };
@@ -42,7 +45,20 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 	// Cross-window layout sync
 	layoutWatcher: LayoutWatcher | null = null;
 
+	// Kolido mode
+	kolidoReader: KolidoReaderHandle | null = null;
+
 	constructor(private readonly context: vscode.ExtensionContext) {}
+
+	/** Check if Kolido mode is enabled in VS Code settings */
+	private get isKolidoMode(): boolean {
+		return vscode.workspace.getConfiguration().get<boolean>(KOLIDO_SETTING_MODE, false);
+	}
+
+	/** Get the configured audit log path */
+	private get kolidoAuditLogPath(): string {
+		return vscode.workspace.getConfiguration().get<string>(KOLIDO_SETTING_AUDIT_LOG, KOLIDO_DEFAULT_AUDIT_LOG);
+	}
 
 	private get extensionUri(): vscode.Uri {
 		return this.context.extensionUri;
@@ -63,6 +79,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
 		webviewView.webview.onDidReceiveMessage(async (message) => {
 			if (message.type === 'openClaude') {
+				if (this.isKolidoMode) return; // Kolido mode: no manual terminal launch
 				await launchNewTerminal(
 					this.nextAgentId, this.nextTerminalIndex,
 					this.agents, this.activeAgentId, this.knownJsonlFiles,
@@ -73,12 +90,12 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 				);
 			} else if (message.type === 'focusAgent') {
 				const agent = this.agents.get(message.id);
-				if (agent) {
+				if (agent && !agent.isKolido) {
 					agent.terminalRef.show();
 				}
 			} else if (message.type === 'closeAgent') {
 				const agent = this.agents.get(message.id);
-				if (agent) {
+				if (agent && !agent.isKolido) {
 					agent.terminalRef.dispose();
 				}
 			} else if (message.type === 'saveAgentSeats') {
@@ -91,19 +108,10 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 			} else if (message.type === 'setSoundEnabled') {
 				this.context.globalState.update(GLOBAL_KEY_SOUND_ENABLED, message.enabled);
 			} else if (message.type === 'webviewReady') {
-				restoreAgents(
-					this.context,
-					this.nextAgentId, this.nextTerminalIndex,
-					this.agents, this.knownJsonlFiles,
-					this.fileWatchers, this.pollingTimers, this.waitingTimers, this.permissionTimers,
-					this.jsonlPollTimers, this.projectScanTimer, this.activeAgentId,
-					this.webview, this.persistAgents,
-				);
-				// Send persisted settings to webview
+				// ── Common setup (both modes) ────────────────────────
 				const soundEnabled = this.context.globalState.get<boolean>(GLOBAL_KEY_SOUND_ENABLED, true);
 				this.webview?.postMessage({ type: 'settingsLoaded', soundEnabled });
 
-				// Send workspace folders to webview (only when multi-root)
 				const wsFolders = vscode.workspace.workspaceFolders;
 				if (wsFolders && wsFolders.length > 1) {
 					this.webview?.postMessage({
@@ -112,7 +120,34 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 					});
 				}
 
-				// Ensure project scan runs even with no restored agents (to adopt external terminals)
+				// ── Kolido mode branch ───────────────────────────────
+				if (this.isKolidoMode) {
+					console.log('[Kolido] Kolido mode enabled — creating fixed agents');
+					createKolidoAgents(this.nextAgentId, this.agents, this.webview);
+
+					// Load assets + layout (same as normal mode)
+					await this.loadAssetsAndLayout();
+
+					// Send agents to webview
+					sendExistingAgents(this.agents, this.context, this.webview);
+
+					// Start tailing audit log
+					const auditPath = this.kolidoAuditLogPath;
+					console.log(`[Kolido] Starting audit reader: ${auditPath}`);
+					this.kolidoReader = startKolidoReader(auditPath, this.agents, this.webview);
+					return; // skip normal terminal-based restore
+				}
+
+				// ── Normal (terminal) mode ───────────────────────────
+				restoreAgents(
+					this.context,
+					this.nextAgentId, this.nextTerminalIndex,
+					this.agents, this.knownJsonlFiles,
+					this.fileWatchers, this.pollingTimers, this.waitingTimers, this.permissionTimers,
+					this.jsonlPollTimers, this.projectScanTimer, this.activeAgentId,
+					this.webview, this.persistAgents,
+				);
+
 				const projectDir = getProjectDirPath();
 				const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 				console.log('[Extension] workspaceRoot:', workspaceRoot);
@@ -124,105 +159,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 						this.fileWatchers, this.pollingTimers, this.waitingTimers, this.permissionTimers,
 						this.webview, this.persistAgents,
 					);
-
-					// Load furniture assets BEFORE sending layout
-					(async () => {
-						try {
-							console.log('[Extension] Loading furniture assets...');
-							const extensionPath = this.extensionUri.fsPath;
-							console.log('[Extension] extensionPath:', extensionPath);
-
-							// Check bundled location first: extensionPath/dist/assets/
-							const bundledAssetsDir = path.join(extensionPath, 'dist', 'assets');
-							let assetsRoot: string | null = null;
-							if (fs.existsSync(bundledAssetsDir)) {
-								console.log('[Extension] Found bundled assets at dist/');
-								assetsRoot = path.join(extensionPath, 'dist');
-							} else if (workspaceRoot) {
-								// Fall back to workspace root (development or external assets)
-								console.log('[Extension] Trying workspace for assets...');
-								assetsRoot = workspaceRoot;
-							}
-
-							if (!assetsRoot) {
-								console.log('[Extension] ⚠️  No assets directory found');
-								if (this.webview) {
-									sendLayout(this.context, this.webview, this.defaultLayout);
-									this.startLayoutWatcher();
-								}
-								return;
-							}
-
-							console.log('[Extension] Using assetsRoot:', assetsRoot);
-
-							// Load bundled default layout
-							this.defaultLayout = loadDefaultLayout(assetsRoot);
-
-							// Load character sprites
-							const charSprites = await loadCharacterSprites(assetsRoot);
-							if (charSprites && this.webview) {
-								console.log('[Extension] Character sprites loaded, sending to webview');
-								sendCharacterSpritesToWebview(this.webview, charSprites);
-							}
-
-							// Load floor tiles
-							const floorTiles = await loadFloorTiles(assetsRoot);
-							if (floorTiles && this.webview) {
-								console.log('[Extension] Floor tiles loaded, sending to webview');
-								sendFloorTilesToWebview(this.webview, floorTiles);
-							}
-
-							// Load wall tiles
-							const wallTiles = await loadWallTiles(assetsRoot);
-							if (wallTiles && this.webview) {
-								console.log('[Extension] Wall tiles loaded, sending to webview');
-								sendWallTilesToWebview(this.webview, wallTiles);
-							}
-
-							const assets = await loadFurnitureAssets(assetsRoot);
-							if (assets && this.webview) {
-								console.log('[Extension] ✅ Assets loaded, sending to webview');
-								sendAssetsToWebview(this.webview, assets);
-							}
-						} catch (err) {
-							console.error('[Extension] ❌ Error loading assets:', err);
-						}
-						// Always send saved layout (or null for default)
-						if (this.webview) {
-							console.log('[Extension] Sending saved layout');
-							sendLayout(this.context, this.webview, this.defaultLayout);
-							this.startLayoutWatcher();
-						}
-					})();
-				} else {
-					// No project dir — still try to load floor/wall tiles, then send saved layout
-					(async () => {
-						try {
-							const ep = this.extensionUri.fsPath;
-							const bundled = path.join(ep, 'dist', 'assets');
-							if (fs.existsSync(bundled)) {
-								const distRoot = path.join(ep, 'dist');
-								this.defaultLayout = loadDefaultLayout(distRoot);
-								const cs = await loadCharacterSprites(distRoot);
-								if (cs && this.webview) {
-									sendCharacterSpritesToWebview(this.webview, cs);
-								}
-								const ft = await loadFloorTiles(distRoot);
-								if (ft && this.webview) {
-									sendFloorTilesToWebview(this.webview, ft);
-								}
-								const wt = await loadWallTiles(distRoot);
-								if (wt && this.webview) {
-									sendWallTilesToWebview(this.webview, wt);
-								}
-							}
-						} catch { /* ignore */ }
-						if (this.webview) {
-							sendLayout(this.context, this.webview, this.defaultLayout);
-							this.startLayoutWatcher();
-						}
-					})();
 				}
+
+				await this.loadAssetsAndLayout();
 				sendExistingAgents(this.agents, this.context, this.webview);
 			} else if (message.type === 'openSessionsFolder') {
 				const projectDir = getProjectDirPath();
@@ -295,6 +234,52 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 		});
 	}
 
+	/** Load all assets (furniture, sprites, tiles) and send layout to webview */
+	private async loadAssetsAndLayout(): Promise<void> {
+		try {
+			const extensionPath = this.extensionUri.fsPath;
+			const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+			const bundledAssetsDir = path.join(extensionPath, 'dist', 'assets');
+			let assetsRoot: string | null = null;
+			if (fs.existsSync(bundledAssetsDir)) {
+				assetsRoot = path.join(extensionPath, 'dist');
+			} else if (workspaceRoot) {
+				assetsRoot = workspaceRoot;
+			}
+
+			if (assetsRoot) {
+				this.defaultLayout = loadDefaultLayout(assetsRoot);
+
+				const charSprites = await loadCharacterSprites(assetsRoot);
+				if (charSprites && this.webview) {
+					sendCharacterSpritesToWebview(this.webview, charSprites);
+				}
+
+				const floorTiles = await loadFloorTiles(assetsRoot);
+				if (floorTiles && this.webview) {
+					sendFloorTilesToWebview(this.webview, floorTiles);
+				}
+
+				const wallTiles = await loadWallTiles(assetsRoot);
+				if (wallTiles && this.webview) {
+					sendWallTilesToWebview(this.webview, wallTiles);
+				}
+
+				const assets = await loadFurnitureAssets(assetsRoot);
+				if (assets && this.webview) {
+					sendAssetsToWebview(this.webview, assets);
+				}
+			}
+		} catch (err) {
+			console.error('[Extension] Error loading assets:', err);
+		}
+		if (this.webview) {
+			sendLayout(this.context, this.webview, this.defaultLayout);
+			this.startLayoutWatcher();
+		}
+	}
+
 	/** Export current saved layout to webview-ui/public/assets/default-layout.json (dev utility) */
 	exportDefaultLayout(): void {
 		const layout = readLayoutFromFile();
@@ -324,6 +309,11 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 	dispose() {
 		this.layoutWatcher?.dispose();
 		this.layoutWatcher = null;
+		// Dispose Kolido reader if active
+		if (this.kolidoReader) {
+			this.kolidoReader.dispose();
+			this.kolidoReader = null;
+		}
 		for (const id of [...this.agents.keys()]) {
 			removeAgent(
 				id, this.agents,

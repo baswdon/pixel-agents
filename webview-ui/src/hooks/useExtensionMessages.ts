@@ -40,11 +40,17 @@ export interface WorkspaceFolder {
   path: string
 }
 
+export interface AgentMeta {
+  modelTier?: string
+  modelTag?: string
+}
+
 export interface ExtensionMessageState {
   agents: number[]
   selectedAgent: number | null
   agentTools: Record<number, ToolActivity[]>
   agentStatuses: Record<number, string>
+  agentMetas: Record<number, AgentMeta>
   subagentTools: Record<number, Record<string, ToolActivity[]>>
   subagentCharacters: SubagentCharacter[]
   layoutReady: boolean
@@ -70,6 +76,7 @@ export function useExtensionMessages(
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null)
   const [agentTools, setAgentTools] = useState<Record<number, ToolActivity[]>>({})
   const [agentStatuses, setAgentStatuses] = useState<Record<number, string>>({})
+  const [agentMetas, setAgentMetas] = useState<Record<number, AgentMeta>>({})
   const [subagentTools, setSubagentTools] = useState<Record<number, Record<string, ToolActivity[]>>>({})
   const [subagentCharacters, setSubagentCharacters] = useState<SubagentCharacter[]>([])
   const [layoutReady, setLayoutReady] = useState(false)
@@ -130,6 +137,12 @@ export function useExtensionMessages(
           return next
         })
         setAgentStatuses((prev) => {
+          if (!(id in prev)) return prev
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        setAgentMetas((prev) => {
           if (!(id in prev)) return prev
           const next = { ...prev }
           delete next[id]
@@ -236,6 +249,14 @@ export function useExtensionMessages(
           os.showWaitingBubble(id)
           playDoneSound()
         }
+      } else if (msg.type === 'agentMeta') {
+        const id = msg.id as number
+        const modelTier = msg.modelTier as string | undefined
+        const modelTag = msg.modelTag as string | undefined
+        setAgentMetas((prev) => ({
+          ...prev,
+          [id]: { modelTier, modelTag },
+        }))
       } else if (msg.type === 'agentToolPermission') {
         const id = msg.id as number
         setAgentTools((prev) => {
@@ -360,5 +381,5 @@ export function useExtensionMessages(
     return () => window.removeEventListener('message', handler)
   }, [getOfficeState])
 
-  return { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders }
+  return { agents, selectedAgent, agentTools, agentStatuses, agentMetas, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders }
 }

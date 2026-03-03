@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
-import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js'
+import type { SubagentCharacter, AgentMeta } from '../../hooks/useExtensionMessages.js'
 import { TILE_SIZE, CharacterState } from '../types.js'
 import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
 
@@ -9,6 +9,7 @@ interface ToolOverlayProps {
   officeState: OfficeState
   agents: number[]
   agentTools: Record<number, ToolActivity[]>
+  agentMetas: Record<number, AgentMeta>
   subagentCharacters: SubagentCharacter[]
   containerRef: React.RefObject<HTMLDivElement | null>
   zoom: number
@@ -40,10 +41,26 @@ function getActivityText(
   return 'Idle'
 }
 
+/** Get tier badge color */
+function getTierColor(tier: string | undefined): string | null {
+  if (!tier) return null
+  switch (tier.toUpperCase()) {
+    case 'BOOST':
+      return 'var(--pixel-status-active, #3794ff)'
+    case 'BASELINE':
+      return 'var(--pixel-text-dim, #888)'
+    case 'EASY':
+      return 'var(--vscode-charts-green, #73c991)'
+    default:
+      return null
+  }
+}
+
 export function ToolOverlay({
   officeState,
   agents,
   agentTools,
+  agentMetas,
   subagentCharacters,
   containerRef,
   zoom,
@@ -193,6 +210,24 @@ export function ToolOverlay({
                     {ch.folderName}
                   </span>
                 )}
+                {(() => {
+                  const meta = agentMetas[id]
+                  const tierColor = getTierColor(meta?.modelTier)
+                  if (!meta?.modelTier || !tierColor) return null
+                  return (
+                    <span
+                      style={{
+                        fontSize: '14px',
+                        color: tierColor,
+                        fontWeight: 600,
+                        letterSpacing: '0.5px',
+                        display: 'block',
+                      }}
+                    >
+                      {meta.modelTier}
+                    </span>
+                  )
+                })()}
               </div>
               {isSelected && !isSub && (
                 <button

@@ -7,6 +7,7 @@ import { cancelWaitingTimer, cancelPermissionTimer } from './timerManager.js';
 import { startFileWatching, readNewLines, ensureProjectScan } from './fileWatcher.js';
 import { JSONL_POLL_INTERVAL_MS, TERMINAL_NAME_PREFIX, WORKSPACE_KEY_AGENTS, WORKSPACE_KEY_AGENT_SEATS } from './constants.js';
 import { migrateAndLoadLayout } from './layoutPersistence.js';
+import { KOLIDO_AGENTS } from './kolidoConfig.js';
 
 export function getProjectDirPath(cwd?: string): string | null {
 	const workspacePath = cwd || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -333,4 +334,49 @@ export function sendLayout(
 		type: 'layoutLoaded',
 		layout,
 	});
+}
+
+// ── Kolido Mode ──────────────────────────────────────────────
+
+/**
+ * Create 6 fixed Kolido agents (no terminal, no JSONL file).
+ * Returns the populated agents map — caller is responsible for
+ * sending existingAgents to the webview and starting the audit reader.
+ */
+export function createKolidoAgents(
+	nextAgentIdRef: { current: number },
+	agents: Map<number, AgentState>,
+	webview: vscode.Webview | undefined,
+): void {
+	// Dummy terminal — Kolido agents have no real terminal
+	const dummyTerminal = { name: 'kolido-dummy', show() {}, dispose() {} } as unknown as vscode.Terminal;
+
+	for (const cfg of KOLIDO_AGENTS) {
+		const id = nextAgentIdRef.current++;
+		const agent: AgentState = {
+			id,
+			terminalRef: dummyTerminal,
+			projectDir: '',
+			jsonlFile: '',
+			fileOffset: 0,
+			lineBuffer: '',
+			activeToolIds: new Set(),
+			activeToolStatuses: new Map(),
+			activeToolNames: new Map(),
+			activeSubagentToolIds: new Map(),
+			activeSubagentToolNames: new Map(),
+			isWaiting: false,
+			permissionSent: false,
+			hadToolsInTurn: false,
+			// folderName carries the display name through to the webview
+			// (sendExistingAgents → existingAgents → os.addAgent → ch.folderName)
+			folderName: cfg.displayName,
+			// Kolido fields
+			isKolido: true,
+			kolidoAgentId: cfg.agentId,
+			kolidoDisplayName: cfg.displayName,
+		};
+		agents.set(id, agent);
+		console.log(`[Kolido] Created agent ${id}: ${cfg.displayName} (${cfg.agentId})`);
+	}
 }

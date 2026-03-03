@@ -1,0 +1,32 @@
+{"timestamp":"2025-01-15T10:00:00Z","event":"agent_chat_received","agent_id":"agent_media_dev","detail":{"channel":"media-dev","message":"analyze the video codec"}}
+{"timestamp":"2025-01-15T10:00:01Z","event":"chat_model_selected","agent_id":"agent_media_dev","detail":{"tier":"boost","model_tag":"qwen2.5-coder:14b"}}
+{"timestamp":"2025-01-15T10:00:02Z","event":"llm_request","agent_id":"agent_media_dev","detail":{"model":"qwen2.5-coder:14b"}}
+{"timestamp":"2025-01-15T10:00:03Z","event":"llm_response","agent_id":"agent_media_dev","detail":{"tokens":150}}
+{"timestamp":"2025-01-15T10:00:04Z","event":"agent_chat_response","agent_id":"agent_media_dev","detail":{"channel":"media-dev"}}
+{"timestamp":"2025-01-15T10:00:05Z","event":"agent_message_delivered","agent_id":"agent_media_dev","detail":{}}
+{"timestamp":"2025-01-15T10:01:00Z","event":"agent_chat_received","agent_id":"agent_audio","detail":{"channel":"audio","message":"mix the stems"}}
+{"timestamp":"2025-01-15T10:01:01Z","event":"chat_model_selected","agent_id":"agent_audio","detail":{"tier":"baseline","model_tag":"qwen2.5-coder:7b"}}
+{"timestamp":"2025-01-15T10:01:02Z","event":"llm_request","agent_id":"agent_audio","detail":{"model":"qwen2.5-coder:7b"}}
+{"timestamp":"2025-01-15T10:01:03Z","event":"llm_error","agent_id":"agent_audio","detail":{"error":"timeout"}}
+{"timestamp":"2025-01-15T10:02:00Z","event":"agent_chat_received","agent_id":"agent_artist","detail":{"channel":"artist","message":"generate thumbnail"}}
+{"timestamp":"2025-01-15T10:02:01Z","event":"chat_model_selected","agent_id":"agent_artist","detail":{"tier":"easy","model_tag":"qwen2.5-coder:3b"}}
+{"timestamp":"2025-01-15T10:02:02Z","event":"agent_message_routed","agent_id":"agent_artist","detail":{"channel":"pipeline"}}
+{"timestamp":"2025-01-15T10:02:03Z","event":"llm_request","agent_id":"agent_artist","detail":{"model":"qwen2.5-coder:3b"}}
+{"timestamp":"2025-01-15T10:02:04Z","event":"llm_response","agent_id":"agent_artist","detail":{"tokens":80}}
+{"timestamp":"2025-01-15T10:02:05Z","event":"agent_chat_response","agent_id":"agent_artist","detail":{"channel":"artist"}}
+{"timestamp":"2025-01-15T10:02:06Z","event":"agent_message_delivered","agent_id":"agent_artist","detail":{}}
+{"timestamp":"2025-01-15T10:03:00Z","event":"agent_chat_received","agent_id":"agent_toolsmith","detail":{"channel":"toolsmith","bot_token":"SECRET_TOKEN_123"}}
+{"timestamp":"2025-01-15T10:03:01Z","event":"chat_boost_timeout_fallback","agent_id":"agent_toolsmith","detail":{"fallback_model_tag":"qwen2.5-coder:7b"}}
+{"timestamp":"2025-01-15T10:03:02Z","event":"llm_request","agent_id":"agent_toolsmith","detail":{"model":"qwen2.5-coder:7b"}}
+{"timestamp":"2025-01-15T10:03:03Z","event":"agent_chat_error","agent_id":"agent_toolsmith","detail":{"error":"rate_limit"}}
+{"timestamp":"2025-01-15T10:04:00Z","event":"agent_chat_received","agent_id":"agent_pipeline","detail":{"channel":"pipeline"}}
+{"timestamp":"2025-01-15T10:04:01Z","event":"llm_request","agent_id":"agent_pipeline","detail":{"model":"qwen2.5-coder:7b"}}
+{"timestamp":"2025-01-15T10:04:02Z","event":"llm_response","agent_id":"agent_pipeline","detail":{}}
+{"timestamp":"2025-01-15T10:04:03Z","event":"agent_message_delivery_failed","agent_id":"agent_pipeline","detail":{"reason":"channel_closed"}}
+{"timestamp":"2025-01-15T10:05:00Z","event":"agent_chat_received","agent_id":"agent_researcher","detail":{"channel":"researcher"}}
+{"timestamp":"2025-01-15T10:05:01Z","event":"llm_request","agent_id":"agent_researcher","detail":{"model":"qwen2.5-coder:14b"}}
+{"timestamp":"2025-01-15T10:05:02Z","event":"llm_response","agent_id":"agent_researcher","detail":{}}
+{"timestamp":"2025-01-15T10:05:03Z","event":"agent_chat_response","agent_id":"agent_researcher","detail":{"channel":"researcher"}}
+{"timestamp":"2025-01-15T10:05:04Z","event":"agent_message_delivered","agent_id":"agent_researcher","detail":{}}
+{"timestamp":"2025-01-15T10:06:00Z","event":"invalid_event_not_bridged","agent_id":"agent_media_dev","detail":{}}
+{"timestamp":"2025-01-15T10:06:01Z","event":"agent_chat_received","agent_id":"unknown_agent","detail":{}}
