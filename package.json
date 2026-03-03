@@ -31,6 +31,10 @@
       {
         "command": "pixel-agents.kolidoSelfTest",
         "title": "Pixel Agents: Kolido Self-Test"
+      },
+      {
+        "command": "pixel-agents.enableKolidoAuto",
+        "title": "Pixel Agents: Enable Kolido Mode (Auto)"
       }
     ],
     "viewsContainers": {

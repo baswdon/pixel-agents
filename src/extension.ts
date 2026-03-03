@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { PixelAgentsViewProvider } from './PixelAgentsViewProvider.js';
-import { VIEW_ID, COMMAND_SHOW_PANEL, COMMAND_EXPORT_DEFAULT_LAYOUT, COMMAND_KOLIDO_SELF_TEST } from './constants.js';
+import { VIEW_ID, COMMAND_SHOW_PANEL, COMMAND_EXPORT_DEFAULT_LAYOUT, COMMAND_KOLIDO_SELF_TEST, COMMAND_ENABLE_KOLIDO_AUTO } from './constants.js';
 
 let providerInstance: PixelAgentsViewProvider | undefined;
 
@@ -27,6 +27,12 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand(COMMAND_KOLIDO_SELF_TEST, () => {
 			provider.kolidoSelfTest();
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand(COMMAND_ENABLE_KOLIDO_AUTO, () => {
+			provider.enableKolidoAuto();
 		})
 	);
 }

@@ -371,6 +371,33 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
+	// ── Enable Kolido Mode (Auto) ────────────────────────────────
+
+	/**
+	 * Set all Kolido settings and prompt the user to reload.
+	 * Prefers Workspace config when a workspace is open, otherwise Global.
+	 */
+	async enableKolidoAuto(): Promise<void> {
+		const config = vscode.workspace.getConfiguration();
+		const target = vscode.workspace.workspaceFolders
+			? vscode.ConfigurationTarget.Workspace
+			: vscode.ConfigurationTarget.Global;
+
+		await config.update(KOLIDO_SETTING_MODE, true, target);
+		await config.update(KOLIDO_SETTING_AUDIT_LOG, KOLIDO_DEFAULT_AUDIT_LOG, target);
+		await config.update(KOLIDO_SETTING_REPLAY_LAST_N, 0, target);
+
+		console.log(`[Kolido] Settings applied (target=${target === vscode.ConfigurationTarget.Workspace ? 'Workspace' : 'Global'})`);
+
+		const choice = await vscode.window.showInformationMessage(
+			'Kolido Mode enabled. Reload window to activate.',
+			'Reload Now',
+		);
+		if (choice === 'Reload Now') {
+			vscode.commands.executeCommand('workbench.action.reloadWindow');
+		}
+	}
+
 	private startLayoutWatcher(): void {
 		if (this.layoutWatcher) return;
 		this.layoutWatcher = watchLayoutFile((layout) => {

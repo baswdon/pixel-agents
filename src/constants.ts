@@ -37,6 +37,7 @@ export const VIEW_ID = 'pixel-agents.panelView';
 export const COMMAND_SHOW_PANEL = 'pixel-agents.showPanel';
 export const COMMAND_EXPORT_DEFAULT_LAYOUT = 'pixel-agents.exportDefaultLayout';
 export const COMMAND_KOLIDO_SELF_TEST = 'pixel-agents.kolidoSelfTest';
+export const COMMAND_ENABLE_KOLIDO_AUTO = 'pixel-agents.enableKolidoAuto';
 export const WORKSPACE_KEY_AGENTS = 'pixel-agents.agents';
 export const WORKSPACE_KEY_AGENT_SEATS = 'pixel-agents.agentSeats';
 export const WORKSPACE_KEY_LAYOUT = 'pixel-agents.layout';
