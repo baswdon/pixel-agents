@@ -1,5 +1,6 @@
 .vscode/**
 .vscode-test/**
+.vscode-devhost-userdata/**
 out/**
 **/node_modules/**
 src/**
